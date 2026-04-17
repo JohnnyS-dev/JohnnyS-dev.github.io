@@ -1,0 +1,2221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JS OS — John Savoy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* =============================================
+       Section 1: CSS Custom Properties
+       ============================================= */
+    :root {
+      --accent-primary: #38bdf8;
+      --accent-secondary: #0ea5e9;
+      --accent-teal: #14b8a6;
+      --glass-bg: rgba(10, 22, 40, 0.45);
+      --glass-border: rgba(100, 180, 255, 0.18);
+      --glass-window: rgba(10, 22, 40, 0.55);
+      --text-primary: rgba(220, 240, 255, 0.95);
+      --text-secondary: rgba(160, 200, 240, 0.70);
+      --wallpaper-start: #0a1628;
+      --wallpaper-end: #0a3d4a;
+      --blur-sm: 12px;
+      --blur-md: 20px;
+      --blur-lg: 24px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 12px;
+      --radius-xl: 20px;
+    }
+
+    /* =============================================
+       Section 2: Reset and Base Styles
+       ============================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      color: var(--text-primary);
+      background: var(--wallpaper-start);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+      color: inherit;
+    }
+    input, textarea {
+      font-family: inherit;
+    }
+
+    /* =============================================
+       Section 3: Boot Screen
+       ============================================= */
+    #boot-screen {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 10000;
+      transition: opacity 0.4s ease;
+    }
+    #boot-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .boot-mark {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+      box-shadow: 0 0 40px rgba(56, 189, 248, 0.4);
+      opacity: 0;
+      animation: bootMarkIn 0.3s ease forwards;
+    }
+    @keyframes bootMarkIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .boot-progress-wrap {
+      width: 200px;
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      opacity: 0;
+      animation: bootFadeIn 0.2s 0.3s ease forwards;
+    }
+    .boot-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+      border-radius: 2px;
+      animation: bootProgress 1.5s 0.3s ease forwards;
+    }
+    @keyframes bootFadeIn {
+      to { opacity: 1; }
+    }
+    @keyframes bootProgress {
+      from { width: 0%; }
+      to   { width: 100%; }
+    }
+    .boot-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.3px;
+      opacity: 0;
+      animation: bootFadeIn 0.2s 0.3s ease forwards;
+    }
+
+    /* =============================================
+       Section 4: Desktop and Wallpaper
+       ============================================= */
+    #desktop {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #desktop.visible {
+      opacity: 1;
+    }
+    #desktop-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      margin-top: 28px;
+      margin-bottom: 90px;
+    }
+
+    /* Wallpaper */
+    .wallpaper {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, var(--wallpaper-start) 0%, #071e38 40%, #073344 70%, var(--wallpaper-end) 100%);
+      animation: wallpaperShift 12s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes wallpaperShift {
+      from { filter: hue-rotate(0deg); }
+      to   { filter: hue-rotate(15deg); }
+    }
+
+    /* Stars */
+    .stars-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      animation: starTwinkle var(--dur, 3s) ease-in-out infinite alternate;
+    }
+    @keyframes starTwinkle {
+      from { opacity: var(--op-start, 0.3); }
+      to   { opacity: var(--op-end, 0.9); }
+    }
+
+    /* Mountain silhouettes */
+    .mountains {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 200px;
+      pointer-events: none;
+    }
+    .mountain-back {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 140px;
+      background: #071828;
+      clip-path: polygon(0% 100%, 0% 60%, 8% 35%, 15% 50%, 22% 20%, 30% 55%, 38% 30%, 46% 48%, 53% 15%, 60% 45%, 67% 28%, 74% 50%, 80% 32%, 87% 55%, 93% 38%, 100% 60%, 100% 100%);
+    }
+    .mountain-mid {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 110px;
+      background: #061420;
+      clip-path: polygon(0% 100%, 0% 70%, 6% 45%, 12% 65%, 19% 38%, 27% 60%, 35% 42%, 43% 70%, 50% 30%, 57% 58%, 64% 40%, 71% 62%, 79% 38%, 85% 58%, 92% 42%, 100% 68%, 100% 100%);
+    }
+    .mountain-front {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 70px;
+      background: #050e1a;
+      clip-path: polygon(0% 100%, 0% 80%, 10% 55%, 20% 75%, 30% 50%, 42% 72%, 52% 42%, 62% 70%, 73% 52%, 84% 74%, 92% 58%, 100% 78%, 100% 100%);
+    }
+
+    /* =============================================
+       Section 5: Menu Bar
+       ============================================= */
+    #menu-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 28px;
+      background: var(--glass-bg);
+      -webkit-backdrop-filter: blur(var(--blur-md));
+      backdrop-filter: blur(var(--blur-md));
+      border-bottom: 0.5px solid rgba(100, 180, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      z-index: 9000;
+    }
+    .menu-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .menu-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .js-mark-sm {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .js-mark-sm:hover { opacity: 0.85; }
+    .menu-app-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .menu-item {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      cursor: default;
+    }
+    #menu-clock {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: 0.2px;
+    }
+    .menu-icon {
+      opacity: 0.6;
+      display: flex;
+      align-items: center;
+    }
+
+    /* =============================================
+       Section 6: Desktop Icons
+       ============================================= */
+    .desktop-icon {
+      position: absolute;
+      width: 72px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      z-index: 10;
+      transition: opacity 0.15s;
+      will-change: transform;
+    }
+    .desktop-icon:hover .icon-img { transform: scale(1.06); }
+    .desktop-icon.selected .icon-label-wrap {
+      background: rgba(56, 189, 248, 0.25);
+      border-radius: 4px;
+    }
+    .desktop-icon.dragging {
+      transform: scale(1.05);
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.5));
+      z-index: 100;
+    }
+    .icon-img {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+    .icon-label-wrap {
+      padding: 1px 4px;
+    }
+    .icon-label {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-primary);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 72px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+
+    /* =============================================
+       Section 7: Window System
+       ============================================= */
+    .window {
+      position: absolute;
+      min-width: 340px;
+      max-width: 680px;
+      max-height: 70vh;
+      border-radius: var(--radius-lg);
+      border: 0.5px solid rgba(100, 180, 255, 0.20);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 0.5px 0 rgba(255,255,255,0.10);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      will-change: transform;
+      animation: windowOpen 0.18s ease forwards;
+    }
+    @keyframes windowOpen {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .window.closing {
+      animation: windowClose 0.15s ease forwards;
+    }
+    @keyframes windowClose {
+      from { opacity: 1; transform: scale(1); }
+      to   { opacity: 0; transform: scale(0.95); }
+    }
+    .window.minimized {
+      max-height: 32px;
+      min-height: 32px;
+      overflow: hidden;
+      resize: none;
+    }
+    .window.maximized {
+      top: 4px !important;
+      left: 4px !important;
+      width: calc(100% - 8px) !important;
+      max-width: none !important;
+      height: calc(100% - 8px) !important;
+      max-height: none !important;
+    }
+    .window-chrome {
+      height: 32px;
+      min-height: 32px;
+      background: rgba(15, 30, 55, 0.60);
+      -webkit-backdrop-filter: blur(var(--blur-lg));
+      backdrop-filter: blur(var(--blur-lg));
+      border-bottom: 0.5px solid rgba(100, 180, 255, 0.15);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      cursor: move;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .traffic-lights {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 1;
+    }
+    .tl-btn {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: filter 0.1s;
+      position: relative;
+    }
+    .tl-btn:hover { filter: brightness(1.2); }
+    .tl-close  { background: #ff5f57; }
+    .tl-min    { background: #febc2e; }
+    .tl-max    { background: #28c840; }
+    .window-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(200, 220, 240, 0.7);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .window-body {
+      background: var(--glass-window);
+      -webkit-backdrop-filter: blur(var(--blur-lg));
+      backdrop-filter: blur(var(--blur-lg));
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .window-body::-webkit-scrollbar { width: 4px; }
+    .window-body::-webkit-scrollbar-track { background: transparent; }
+    .window-body::-webkit-scrollbar-thumb { background: rgba(100, 180, 255, 0.2); border-radius: 2px; }
+
+    /* =============================================
+       Section 8: Dock
+       ============================================= */
+    #dock-wrapper {
+      position: fixed;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9000;
+      display: flex;
+      justify-content: center;
+    }
+    #dock {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(15, 25, 45, 0.40);
+      -webkit-backdrop-filter: blur(var(--blur-lg));
+      backdrop-filter: blur(var(--blur-lg));
+      border: 0.5px solid rgba(100, 180, 255, 0.18);
+      border-radius: var(--radius-xl);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.30), inset 0 0.5px 0 rgba(255,255,255,0.08);
+    }
+    .dock-item {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .dock-item .dock-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      transition: transform 0.15s ease;
+    }
+    .dock-item:hover .dock-icon {
+      transform: translateY(-6px) scale(1.2);
+    }
+    .dock-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 30, 55, 0.85);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border: 0.5px solid var(--glass-border);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--text-primary);
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .dock-item:hover .dock-tooltip { opacity: 1; }
+    .dock-indicator {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      margin-top: 3px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .dock-indicator.active { opacity: 1; }
+    .dock-divider {
+      width: 0.5px;
+      height: 40px;
+      background: rgba(100, 180, 255, 0.25);
+      align-self: center;
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* =============================================
+       Section 9: Window Content Styles
+       ============================================= */
+
+    /* Shared */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 9px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .pill-accent {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-primary);
+      border: 0.5px solid rgba(56, 189, 248, 0.3);
+    }
+    .pill-stack {
+      background: rgba(255,255,255,0.07);
+      color: var(--text-secondary);
+      border: 0.5px solid rgba(255,255,255,0.1);
+    }
+    .pills-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin: 8px 0;
+    }
+    .win-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+    .win-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+    .win-btn-primary {
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      color: #fff;
+    }
+    .win-btn-secondary {
+      background: rgba(255,255,255,0.07);
+      color: var(--text-secondary);
+      border: 0.5px solid rgba(255,255,255,0.1);
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* Project Window */
+    .proj-tag { margin-bottom: 6px; }
+    .proj-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 3px;
+    }
+    .proj-tagline {
+      font-size: 12px;
+      font-style: italic;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    .proj-section-label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(100, 180, 255, 0.6);
+      margin-bottom: 4px;
+      margin-top: 10px;
+    }
+    .proj-body {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .proj-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .proj-features li {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      display: flex;
+      gap: 6px;
+    }
+    .proj-features li::before {
+      content: '—';
+      color: var(--accent-primary);
+      flex-shrink: 0;
+    }
+    .proj-divider {
+      height: 0.5px;
+      background: rgba(100, 180, 255, 0.1);
+      margin: 10px 0;
+    }
+
+    /* About Window */
+    .about-cover {
+      height: 80px;
+      background: linear-gradient(135deg, #0ea5e9, #14b8a6, #38bdf8);
+      border-radius: 8px 8px 0 0;
+      margin: -16px -16px 0 -16px;
+      position: relative;
+    }
+    .about-avatar {
+      position: absolute;
+      bottom: -28px;
+      left: 16px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0369a1, #38bdf8);
+      border: 3px solid var(--glass-window);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .about-header {
+      padding-top: 36px;
+      margin-bottom: 12px;
+    }
+    .about-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .about-title-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .about-location {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .about-bio {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+      margin: 10px 0;
+    }
+    .about-stats {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .stat-card {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 0.5px solid rgba(100, 180, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-primary);
+    }
+    .stat-label {
+      font-size: 9px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* Contact Window */
+    .mail-field {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 0.5px solid rgba(100, 180, 255, 0.1);
+    }
+    .mail-field-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      min-width: 50px;
+      padding-top: 1px;
+    }
+    .mail-field-value {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .mail-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-size: 11px;
+      color: var(--text-primary);
+      padding: 0;
+    }
+    .mail-input::placeholder { color: rgba(160, 200, 240, 0.3); }
+    .mail-textarea {
+      width: 100%;
+      background: none;
+      border: none;
+      outline: none;
+      font-size: 11px;
+      color: var(--text-primary);
+      line-height: 1.6;
+      resize: none;
+      margin-top: 12px;
+      min-height: 120px;
+    }
+    .mail-textarea::placeholder { color: rgba(160, 200, 240, 0.3); }
+    .mail-send-btn {
+      width: 100%;
+      padding: 9px;
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      color: #fff;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: opacity 0.15s;
+      border: none;
+    }
+    .mail-send-btn:hover { opacity: 0.9; }
+    .mail-success {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px;
+      text-align: center;
+    }
+    .mail-success.visible { display: flex; }
+    .mail-success-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1.5px solid var(--accent-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mail-success h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .mail-success p {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* Resume Window */
+    .resume-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+    .resume-panel {
+      background: #fff;
+      border-radius: 6px;
+      padding: 24px;
+      color: #1a1a1a;
+      font-family: 'Inter', sans-serif;
+    }
+    .resume-panel h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #111;
+      margin-bottom: 2px;
+    }
+    .resume-panel .res-subtitle {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .resume-panel .res-contact-line {
+      font-size: 10px;
+      color: #777;
+      margin-bottom: 16px;
+    }
+    .resume-panel h2 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #0ea5e9;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 4px;
+      margin: 16px 0 8px;
+    }
+    .resume-panel p, .resume-panel li {
+      font-size: 11px;
+      color: #333;
+      line-height: 1.55;
+    }
+    .resume-panel ul {
+      padding-left: 16px;
+      margin: 4px 0;
+    }
+    .resume-panel .res-skill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 4px 0;
+    }
+    .resume-panel .res-skill-pill {
+      background: #f0f9ff;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+      border-radius: 20px;
+      padding: 1px 8px;
+      font-size: 9px;
+      font-weight: 500;
+    }
+    .res-proj-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111;
+      margin-top: 6px;
+    }
+    .res-proj-sub {
+      font-size: 10px;
+      color: #888;
+      margin-bottom: 2px;
+    }
+
+    /* Skills Window */
+    .skills-layout {
+      display: flex;
+      gap: 0;
+      height: 100%;
+      min-height: 260px;
+      margin: -16px;
+    }
+    .skills-sidebar {
+      width: 38%;
+      min-width: 120px;
+      border-right: 0.5px solid rgba(100, 180, 255, 0.12);
+      padding: 12px 0;
+    }
+    .skills-sidebar-item {
+      padding: 7px 16px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .skills-sidebar-item:hover { background: rgba(255,255,255,0.04); }
+    .skills-sidebar-item.active {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent-primary);
+    }
+    .skills-content {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .skills-content::-webkit-scrollbar { width: 4px; }
+    .skills-content::-webkit-scrollbar-thumb { background: rgba(100,180,255,0.2); border-radius: 2px; }
+    .skill-item {
+      margin-bottom: 12px;
+    }
+    .skill-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .skill-name {
+      font-size: 11px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .skill-level {
+      font-size: 9px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .skill-bar-bg {
+      height: 3px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .skill-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+      width: 0%;
+      transition: width 0.6s ease;
+    }
+    .skills-cat-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 14px;
+    }
+
+    /* Craev Window */
+    .craev-player {
+      background: #000;
+      border-radius: 8px;
+      aspect-ratio: 16/9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .craev-play-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(56,189,248,0.15);
+      border: 1.5px solid rgba(56,189,248,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .craev-coming-soon {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      text-align: center;
+    }
+    .craev-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    /* =============================================
+       Section 10: Animations and Keyframes
+       ============================================= */
+    @keyframes indicatorPop {
+      from { opacity: 0; transform: scale(0); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background: rgba(15, 30, 55, 0.85);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border: 0.5px solid rgba(100, 180, 255, 0.2);
+      border-radius: 8px;
+      padding: 4px 0;
+      min-width: 160px;
+      z-index: 9500;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .context-menu-item {
+      padding: 6px 14px;
+      font-size: 11px;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .context-menu-item:hover {
+      background: rgba(56, 189, 248, 0.15);
+    }
+    .context-menu-sep {
+      height: 0.5px;
+      background: rgba(100, 180, 255, 0.12);
+      margin: 3px 0;
+    }
+
+    /* =============================================
+       Section 11: Responsive Adjustments
+       ============================================= */
+    @media (max-width: 1023px) and (min-width: 768px) {
+      .desktop-icon { width: 64px; }
+      .icon-img { width: 44px; height: 44px; }
+      .dock-item .dock-icon { width: 44px; height: 44px; }
+      .window { max-width: 90vw; }
+    }
+
+    @media (max-width: 767px) {
+      #desktop { display: none; }
+      #mobile-fallback { display: block; }
+    }
+
+    /* Mobile fallback */
+    #mobile-fallback {
+      display: none;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #0a1628, #0a3d4a);
+      color: var(--text-primary);
+      padding: 24px 16px;
+      overflow-y: auto;
+    }
+    .mob-header {
+      text-align: center;
+      padding: 32px 0 24px;
+    }
+    .mob-js-mark {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 auto 16px;
+    }
+    .mob-header h1 { font-size: 22px; font-weight: 600; }
+    .mob-header p { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    .mob-notice {
+      background: rgba(56,189,248,0.1);
+      border: 0.5px solid rgba(56,189,248,0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: var(--accent-primary);
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .mob-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 20px 0 10px;
+    }
+    .mob-card {
+      background: rgba(10,22,40,0.6);
+      border: 0.5px solid rgba(100,180,255,0.15);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .mob-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .mob-card p { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+    .mob-links {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: center;
+    }
+    .mob-link {
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      color: #fff;
+    }
+    .mob-link-primary { background: linear-gradient(135deg, #38bdf8, #0284c7); }
+    .mob-link-secondary { background: rgba(255,255,255,0.08); border: 0.5px solid rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+
+  <!-- Boot Screen -->
+  <div id="boot-screen">
+    <div class="boot-mark">JS</div>
+    <div class="boot-progress-wrap">
+      <div class="boot-progress-bar"></div>
+    </div>
+    <div class="boot-label">Loading JS OS...</div>
+  </div>
+
+  <!-- Desktop -->
+  <div id="desktop">
+    <!-- Menu Bar -->
+    <div id="menu-bar">
+      <div class="menu-bar-left">
+        <div class="js-mark-sm" id="menu-js-mark">JS</div>
+        <span class="menu-app-name">John Savoy</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">View</span>
+        <span class="menu-item">Window</span>
+      </div>
+      <div class="menu-bar-right">
+        <div class="menu-icon">
+          <!-- WiFi -->
+          <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+            <path d="M7 8.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" fill="rgba(200,220,240,0.6)"/>
+            <path d="M4.5 6.5C5.3 5.7 6.1 5.3 7 5.3s1.7.4 2.5 1.2" stroke="rgba(200,220,240,0.6)" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+            <path d="M2.2 4.3C3.5 3 5.2 2.2 7 2.2s3.5.8 4.8 2.1" stroke="rgba(200,220,240,0.6)" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+            <path d="M0 2.1C1.8.8 4.3 0 7 0s5.2.8 7 2.1" stroke="rgba(200,220,240,0.6)" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="menu-icon">
+          <!-- Battery -->
+          <svg width="18" height="10" viewBox="0 0 18 10" fill="none">
+            <rect x="0.5" y="0.5" width="14" height="9" rx="2.5" stroke="rgba(200,220,240,0.5)" stroke-width="1"/>
+            <rect x="2" y="2" width="9" height="6" rx="1.5" fill="rgba(56,189,248,0.7)"/>
+            <path d="M15.5 3.5v3c.8-.4 1.3-1 1.3-1.5s-.5-1.1-1.3-1.5z" fill="rgba(200,220,240,0.4)"/>
+          </svg>
+        </div>
+        <div id="menu-clock"></div>
+      </div>
+    </div>
+
+    <!-- Desktop Area -->
+    <div id="desktop-area">
+      <div class="wallpaper"></div>
+      <div class="stars-layer" id="stars-layer"></div>
+      <div class="mountains">
+        <div class="mountain-back"></div>
+        <div class="mountain-mid"></div>
+        <div class="mountain-front"></div>
+      </div>
+      <!-- Desktop icons rendered by JS -->
+    </div>
+
+    <!-- Dock -->
+    <div id="dock-wrapper">
+      <div id="dock">
+        <!-- Dock items rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Fallback -->
+  <div id="mobile-fallback">
+    <div class="mob-header">
+      <div class="mob-js-mark">JS</div>
+      <h1>John Savoy</h1>
+      <p>Full Stack Developer — Greensboro, NC</p>
+    </div>
+    <div class="mob-notice">Best experienced on desktop — open on a laptop or computer for the full JS OS experience.</div>
+    <div class="mob-section-title">Projects</div>
+    <div class="mob-card">
+      <h3>Court Reservation System</h3>
+      <p>Reserve a court before you leave the house. Built with Java, Spring Boot, HTML/CSS/JS, PostgreSQL.</p>
+    </div>
+    <div class="mob-card">
+      <h3>Portfolio Tracker</h3>
+      <p>Know exactly where your money stands. Java, Spring Boot, React, PostgreSQL, Alpha Vantage API.</p>
+    </div>
+    <div class="mob-card">
+      <h3>Transaction Categorizer</h3>
+      <p>Upload your bank CSV. Get instant clarity. Java, Spring Boot, React, PostgreSQL.</p>
+    </div>
+    <div class="mob-card">
+      <h3>Volunteer Marketplace</h3>
+      <p>Find where to help. Get verified for doing it. Java, Spring Boot, React, PostgreSQL, PDF Export.</p>
+    </div>
+    <div class="mob-card">
+      <h3>Document Classifier</h3>
+      <p>Drop your docs. Walk away organized. Java, Spring Boot, Apache PDFBox, PostgreSQL.</p>
+    </div>
+    <div class="mob-links">
+      <a href="https://github.com/johnsavoy" target="_blank" class="mob-link mob-link-secondary">GitHub</a>
+      <a href="mailto:thejohnnysavoy@gmail.com" class="mob-link mob-link-primary">Contact</a>
+    </div>
+  </div>
+
+<script>
+/* ==============================================
+   Section 1 — State
+   ============================================== */
+let windowZIndex = 200;
+const openWindows = {};
+
+const ICON_POSITIONS_KEY = 'jsOsIconPositions';
+
+/* ==============================================
+   Section 2 — Boot Sequence
+   ============================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  generateStars();
+  initClock();
+  renderIcons();
+  renderDock();
+
+  const bootScreen = document.getElementById('boot-screen');
+  const desktop = document.getElementById('desktop');
+
+  // Wait for progress bar animation (1.8s start + duration) then fade out boot
+  const progressBar = bootScreen.querySelector('.boot-progress-bar');
+  progressBar.addEventListener('animationend', () => {
+    // Short pause then fade out boot screen
+    setTimeout(() => {
+      bootScreen.classList.add('fade-out');
+      bootScreen.addEventListener('transitionend', () => {
+        bootScreen.style.display = 'none';
+        desktop.classList.add('visible');
+      }, { once: true });
+    }, 200);
+  });
+});
+
+/* ==============================================
+   Section 3 — Star Generation
+   ============================================== */
+function generateStars() {
+  const layer = document.getElementById('stars-layer');
+  const count = 80;
+  for (let i = 0; i < count; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = (Math.random() * 100) + '%';
+    star.style.top = (Math.random() * 65) + '%';
+    star.style.setProperty('--dur', (2 + Math.random() * 3) + 's');
+    star.style.setProperty('--op-start', (0.1 + Math.random() * 0.3).toFixed(2));
+    star.style.setProperty('--op-end', (0.5 + Math.random() * 0.5).toFixed(2));
+    star.style.animationDelay = (Math.random() * 4) + 's';
+    if (Math.random() > 0.7) {
+      star.style.width = '1px';
+      star.style.height = '1px';
+    }
+    layer.appendChild(star);
+  }
+}
+
+/* ==============================================
+   Section 6 — Clock
+   ============================================== */
+function initClock() {
+  function updateClock() {
+    const now = new Date();
+    let h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    document.getElementById('menu-clock').textContent = `${h}:${m} ${ampm}`;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+}
+
+/* ==============================================
+   Section 4 — Icon Config & SVGs
+   ============================================== */
+const ICON_CONFIG = [
+  {
+    id: 'court',
+    label: 'Court Reservation',
+    action: () => openProjectWindow('court'),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#g_court)"/>
+      <defs><linearGradient id="g_court" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#0284c7"/></linearGradient></defs>
+      <rect x="13" y="17" width="26" height="18" rx="2" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" fill="none"/>
+      <line x1="26" y1="17" x2="26" y2="35" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/>
+      <line x1="13" y1="26" x2="39" y2="26" stroke="rgba(255,255,255,0.7)" stroke-width="1" stroke-dasharray="2 2"/>
+      <circle cx="26" cy="26" r="4" stroke="rgba(255,255,255,0.6)" stroke-width="1" fill="none"/>
+    </svg>`
+  },
+  {
+    id: 'portfolio',
+    label: 'Portfolio Tracker',
+    action: () => openProjectWindow('portfolio'),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#g_port)"/>
+      <defs><linearGradient id="g_port" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#10b981"/><stop offset="1" stop-color="#059669"/></linearGradient></defs>
+      <polyline points="12,36 20,28 27,32 36,18" stroke="rgba(255,255,255,0.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <circle cx="36" cy="18" r="2.5" fill="rgba(255,255,255,0.95)"/>
+      <line x1="12" y1="38" x2="40" y2="38" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+      <line x1="12" y1="14" x2="12" y2="38" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    </svg>`
+  },
+  {
+    id: 'transactions',
+    label: 'Transaction Categorizer',
+    action: () => openProjectWindow('transactions'),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#g_trans)"/>
+      <defs><linearGradient id="g_trans" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#f59e0b"/><stop offset="1" stop-color="#d97706"/></linearGradient></defs>
+      <rect x="16" y="12" width="20" height="28" rx="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.8)" stroke-width="1.5"/>
+      <line x1="20" y1="19" x2="32" y2="19" stroke="rgba(255,255,255,0.8)" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="20" y1="23" x2="32" y2="23" stroke="rgba(255,255,255,0.8)" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="20" y1="27" x2="28" y2="27" stroke="rgba(255,255,255,0.8)" stroke-width="1.2" stroke-linecap="round"/>
+      <circle cx="31" cy="33" r="5" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.9)" stroke-width="1.2"/>
+      <line x1="31" y1="30" x2="31" y2="36" stroke="rgba(255,255,255,0.9)" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="28" y1="33" x2="34" y2="33" stroke="rgba(255,255,255,0.9)" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>`
+  },
+  {
+    id: 'volunteer',
+    label: 'Volunteer Marketplace',
+    action: () => openProjectWindow('volunteer'),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#g_vol)"/>
+      <defs><linearGradient id="g_vol" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#ec4899"/><stop offset="1" stop-color="#db2777"/></linearGradient></defs>
+      <path d="M18 26c0-2 1.5-4 4-4s4 2 4 4v2H18v-2z" fill="rgba(255,255,255,0.85)"/>
+      <path d="M26 26c0-2 1.5-4 4-4s4 2 4 4v2H26v-2z" fill="rgba(255,255,255,0.65)"/>
+      <rect x="16" y="28" width="20" height="2" rx="1" fill="rgba(255,255,255,0.85)"/>
+      <path d="M20 20c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" fill="rgba(255,255,255,0.85)"/>
+      <path d="M28 20c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" fill="rgba(255,255,255,0.65)"/>
+      <path d="M24 32l2 5 2-5" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+    </svg>`
+  },
+  {
+    id: 'docclass',
+    label: 'Document Classifier',
+    action: () => openProjectWindow('docclass'),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#g_doc)"/>
+      <defs><linearGradient id="g_doc" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#8b5cf6"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+      <rect x="13" y="15" width="16" height="20" rx="2" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.8)" stroke-width="1.2"/>
+      <rect x="17" y="19" width="16" height="20" rx="2" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2"/>
+      <line x1="21" y1="25" x2="29" y2="25" stroke="rgba(255,255,255,0.9)" stroke-width="1.1" stroke-linecap="round"/>
+      <line x1="21" y1="29" x2="29" y2="29" stroke="rgba(255,255,255,0.9)" stroke-width="1.1" stroke-linecap="round"/>
+      <rect x="30" y="14" width="10" height="6" rx="2" fill="rgba(255,255,255,0.85)"/>
+      <text x="33" y="19.5" font-size="4" fill="#7c3aed" font-family="Inter,sans-serif" font-weight="700">TAG</text>
+    </svg>`
+  },
+  {
+    id: 'craev',
+    label: 'Craev Demo',
+    action: () => openCraevWindow(),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#g_craev)"/>
+      <defs><linearGradient id="g_craev" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#f97316"/><stop offset="1" stop-color="#ea580c"/></linearGradient></defs>
+      <circle cx="26" cy="26" r="12" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2"/>
+      <path d="M23 21l10 5-10 5V21z" fill="rgba(255,255,255,0.95)"/>
+    </svg>`
+  }
+];
+
+/* ==============================================
+   Section 5 — Icon Manager
+   ============================================== */
+function getDefaultPositions() {
+  const area = document.getElementById('desktop-area');
+  const W = area.clientWidth;
+  const cols = 5;
+  const iconW = 80;
+  const iconH = 90;
+  const padX = 20;
+  const padY = 20;
+  const positions = {};
+  ICON_CONFIG.forEach((cfg, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    positions[cfg.id] = {
+      left: padX + col * iconW,
+      top: padY + row * iconH
+    };
+  });
+  return positions;
+}
+
+function loadIconPositions() {
+  try {
+    const saved = localStorage.getItem(ICON_POSITIONS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return null;
+}
+
+function saveIconPositions(positions) {
+  try {
+    localStorage.setItem(ICON_POSITIONS_KEY, JSON.stringify(positions));
+  } catch(e) {}
+}
+
+let iconPositions = loadIconPositions() || null;
+
+function renderIcons() {
+  const area = document.getElementById('desktop-area');
+  if (!iconPositions) {
+    iconPositions = getDefaultPositions();
+  }
+
+  ICON_CONFIG.forEach(cfg => {
+    const el = document.createElement('div');
+    el.className = 'desktop-icon';
+    el.dataset.id = cfg.id;
+    el.innerHTML = `
+      <div class="icon-img">${cfg.svg}</div>
+      <div class="icon-label-wrap"><div class="icon-label">${cfg.label}</div></div>
+    `;
+    const pos = iconPositions[cfg.id] || { left: 20, top: 20 };
+    el.style.left = pos.left + 'px';
+    el.style.top = pos.top + 'px';
+
+    makeIconDraggable(el, cfg);
+    area.appendChild(el);
+  });
+
+  // Right-click context menu on desktop area
+  area.addEventListener('contextmenu', e => {
+    if (e.target === area || e.target.classList.contains('wallpaper') ||
+        e.target.classList.contains('mountains') || e.target.classList.contains('mountain-back') ||
+        e.target.classList.contains('mountain-mid') || e.target.classList.contains('mountain-front') ||
+        e.target.classList.contains('stars-layer')) {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY);
+    }
+  });
+}
+
+function makeIconDraggable(el, cfg) {
+  let dragging = false;
+  let offsetX = 0, offsetY = 0;
+  let hasMoved = false;
+  let clickTimer = null;
+
+  el.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+
+    // Deselect all
+    document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+
+    const rect = el.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    hasMoved = false;
+
+    const onMove = (e) => {
+      if (!dragging && (Math.abs(e.clientX - (rect.left + offsetX)) > 4 || Math.abs(e.clientY - (rect.top + offsetY)) > 4)) {
+        dragging = true;
+        hasMoved = true;
+        el.classList.add('dragging');
+      }
+      if (dragging) {
+        const area = document.getElementById('desktop-area');
+        const areaRect = area.getBoundingClientRect();
+        let newLeft = e.clientX - areaRect.left - offsetX;
+        let newTop = e.clientY - areaRect.top - offsetY;
+        newLeft = Math.max(0, Math.min(areaRect.width - 80, newLeft));
+        newTop = Math.max(0, Math.min(areaRect.height - 90, newTop));
+        el.style.left = newLeft + 'px';
+        el.style.top = newTop + 'px';
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (dragging) {
+        dragging = false;
+        el.classList.remove('dragging');
+        iconPositions[cfg.id] = {
+          left: parseInt(el.style.left),
+          top: parseInt(el.style.top)
+        };
+        saveIconPositions(iconPositions);
+      }
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Double-click to open
+  el.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    cfg.action();
+  });
+
+  // Single click - deselect others
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+  });
+}
+
+// Deselect on desktop click
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('desktop-area')?.addEventListener('click', () => {
+    document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+  });
+});
+
+/* ==============================================
+   Section 7 — Context Menu
+   ============================================== */
+let activeContextMenu = null;
+
+function showContextMenu(x, y) {
+  removeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.innerHTML = `
+    <div class="context-menu-item" data-action="sort">Sort Icons</div>
+    <div class="context-menu-sep"></div>
+    <div class="context-menu-item" data-action="about">About This Portfolio</div>
+  `;
+  document.body.appendChild(menu);
+  activeContextMenu = menu;
+
+  menu.addEventListener('click', e => {
+    const action = e.target.dataset.action;
+    if (action === 'sort') sortIcons();
+    else if (action === 'about') openAboutWindow();
+    removeContextMenu();
+  });
+
+  setTimeout(() => {
+    document.addEventListener('click', removeContextMenu, { once: true });
+  }, 10);
+}
+
+function removeContextMenu() {
+  if (activeContextMenu) {
+    activeContextMenu.remove();
+    activeContextMenu = null;
+  }
+}
+
+function sortIcons() {
+  iconPositions = getDefaultPositions();
+  saveIconPositions(iconPositions);
+  document.querySelectorAll('.desktop-icon').forEach(el => {
+    const id = el.dataset.id;
+    if (iconPositions[id]) {
+      el.style.left = iconPositions[id].left + 'px';
+      el.style.top = iconPositions[id].top + 'px';
+    }
+  });
+}
+
+/* ==============================================
+   Section 8 — Dock
+   ============================================== */
+const DOCK_CONFIG = [
+  {
+    id: 'about',
+    label: 'JS Finder',
+    action: () => openAboutWindow(),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#d_about)"/>
+      <defs><linearGradient id="d_about" x1="0" y1="52" x2="52" y2="0"><stop stop-color="#38bdf8"/><stop offset="1" stop-color="#0284c7"/></linearGradient></defs>
+      <circle cx="26" cy="22" r="7" fill="rgba(255,255,255,0.9)"/>
+      <path d="M14 40c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg>`
+  },
+  {
+    id: 'contact',
+    label: 'JS Mail',
+    action: () => openContactWindow(),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#d_mail)"/>
+      <defs><linearGradient id="d_mail" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+      <rect x="11" y="16" width="30" height="20" rx="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>
+      <path d="M11 19l15 11 15-11" stroke="rgba(255,255,255,0.85)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <rect x="32" y="10" width="12" height="7" rx="2" fill="rgba(56,189,248,0.9)"/>
+      <text x="35" y="15.5" font-size="4" fill="#fff" font-family="Inter,sans-serif" font-weight="700">JS</text>
+    </svg>`
+  },
+  {
+    id: 'resume',
+    label: 'JS Pages',
+    action: () => openResumeWindow(),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#d_res)"/>
+      <defs><linearGradient id="d_res" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+      <rect x="15" y="11" width="22" height="30" rx="3" fill="rgba(255,255,255,0.9)"/>
+      <line x1="19" y1="18" x2="33" y2="18" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="19" y1="22" x2="33" y2="22" stroke="#a78bfa" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="19" y1="26" x2="33" y2="26" stroke="#a78bfa" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="19" y1="30" x2="28" y2="30" stroke="#a78bfa" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>`
+  },
+  {
+    id: 'skills',
+    label: 'Skills',
+    action: () => openSkillsWindow(),
+    svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="52" height="52" rx="12" fill="url(#d_skills)"/>
+      <defs><linearGradient id="d_skills" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#64748b"/><stop offset="1" stop-color="#475569"/></linearGradient></defs>
+      <path d="M26 14a12 12 0 0 1 0 24 12 12 0 0 1 0-24z" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" fill="none"/>
+      <circle cx="26" cy="26" r="4" fill="rgba(255,255,255,0.85)"/>
+      <path d="M26 14v4M26 34v4M14 26h4M34 26h4" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M18.1 18.1l2.8 2.8M31.1 31.1l2.8 2.8M18.1 33.9l2.8-2.8M31.1 20.9l2.8-2.8" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>`
+  },
+];
+
+const GITHUB_DOCK = {
+  id: 'github',
+  label: 'GitHub',
+  href: 'https://github.com/johnsavoy',
+  svg: `<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="52" height="52" rx="12" fill="url(#d_gh)"/>
+    <defs><linearGradient id="d_gh" x1="0" y1="0" x2="52" y2="52"><stop stop-color="#374151"/><stop offset="1" stop-color="#1f2937"/></linearGradient></defs>
+    <path d="M26 13a13 13 0 0 0-4.1 25.3c.6.1.8-.3.8-.6v-2.1c-3.5.8-4.2-1.7-4.2-1.7-.6-1.4-1.4-1.8-1.4-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.8-.3-5.7-1.4-5.7-6.2 0-1.4.5-2.5 1.3-3.4-.1-.3-.6-1.6.1-3.3 0 0 1-.3 3.4 1.3a11.7 11.7 0 0 1 6.2 0c2.4-1.6 3.4-1.3 3.4-1.3.7 1.7.3 3 .1 3.3.8.9 1.3 2 1.3 3.4 0 4.8-2.9 5.9-5.7 6.2.5.4.9 1.2.9 2.4v3.5c0 .3.2.7.8.6A13 13 0 0 0 26 13z" fill="rgba(255,255,255,0.9)"/>
+  </svg>`
+};
+
+function renderDock() {
+  const dock = document.getElementById('dock');
+
+  DOCK_CONFIG.forEach(cfg => {
+    const item = document.createElement('div');
+    item.className = 'dock-item';
+    item.dataset.dockId = cfg.id;
+    item.innerHTML = `
+      <div class="dock-icon">${cfg.svg}</div>
+      <div class="dock-tooltip">${cfg.label}</div>
+      <div class="dock-indicator" id="dock-dot-${cfg.id}"></div>
+    `;
+    item.addEventListener('click', () => {
+      if (openWindows[cfg.id]) {
+        bringToFront(openWindows[cfg.id]);
+      } else {
+        cfg.action();
+      }
+    });
+    dock.appendChild(item);
+  });
+
+  // Divider
+  const divider = document.createElement('div');
+  divider.className = 'dock-divider';
+  dock.appendChild(divider);
+
+  // GitHub
+  const ghItem = document.createElement('div');
+  ghItem.className = 'dock-item';
+  ghItem.innerHTML = `
+    <div class="dock-icon">${GITHUB_DOCK.svg}</div>
+    <div class="dock-tooltip">${GITHUB_DOCK.label}</div>
+    <div class="dock-indicator"></div>
+  `;
+  ghItem.addEventListener('click', () => window.open(GITHUB_DOCK.href, '_blank'));
+  dock.appendChild(ghItem);
+}
+
+function updateDockIndicator(id, active) {
+  const dot = document.getElementById('dock-dot-' + id);
+  if (dot) {
+    dot.classList.toggle('active', active);
+  }
+}
+
+/* ==============================================
+   Section 9 — Window Manager
+   ============================================== */
+function createWindow(id, title, contentHTML, opts = {}) {
+  if (openWindows[id]) {
+    bringToFront(openWindows[id]);
+    return openWindows[id];
+  }
+
+  const win = document.createElement('div');
+  win.className = 'window';
+  win.dataset.windowId = id;
+
+  const width = opts.width || 480;
+  const height = opts.height || 'auto';
+  win.style.width = width + 'px';
+  if (height !== 'auto') win.style.height = height + 'px';
+
+  const desktop = document.getElementById('desktop-area');
+  const dRect = desktop.getBoundingClientRect();
+  const left = Math.max(10, (dRect.width - width) / 2 + (Math.random() - 0.5) * 60);
+  const top = Math.max(10, (dRect.height - 400) / 2 + (Math.random() - 0.5) * 40);
+  win.style.left = left + 'px';
+  win.style.top = top + 'px';
+  win.style.zIndex = ++windowZIndex;
+
+  win.innerHTML = `
+    <div class="window-chrome">
+      <div class="traffic-lights">
+        <div class="tl-btn tl-close" title="Close"></div>
+        <div class="tl-btn tl-min" title="Minimize"></div>
+        <div class="tl-btn tl-max" title="Maximize"></div>
+      </div>
+      <div class="window-title">${title}</div>
+    </div>
+    <div class="window-body">${contentHTML}</div>
+  `;
+
+  desktop.appendChild(win);
+  openWindows[id] = win;
+  updateDockIndicator(id, true);
+
+  // Traffic lights
+  win.querySelector('.tl-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeWindow(win, id);
+  });
+  win.querySelector('.tl-min').addEventListener('click', (e) => {
+    e.stopPropagation();
+    minimizeWindow(win);
+  });
+  win.querySelector('.tl-max').addEventListener('click', (e) => {
+    e.stopPropagation();
+    maximizeWindow(win);
+  });
+
+  // Bring to front on click
+  win.addEventListener('mousedown', () => bringToFront(win));
+
+  // Make draggable
+  makeWindowDraggable(win);
+
+  return win;
+}
+
+function bringToFront(win) {
+  win.style.zIndex = ++windowZIndex;
+}
+
+function closeWindow(win, id) {
+  win.classList.add('closing');
+  win.addEventListener('animationend', () => {
+    win.remove();
+    if (id) {
+      delete openWindows[id];
+      updateDockIndicator(id, false);
+    }
+  }, { once: true });
+}
+
+function minimizeWindow(win) {
+  win.classList.toggle('minimized');
+}
+
+function maximizeWindow(win) {
+  win.classList.toggle('maximized');
+}
+
+function makeWindowDraggable(win) {
+  const chrome = win.querySelector('.window-chrome');
+  let dragging = false;
+  let offsetX = 0, offsetY = 0;
+
+  chrome.addEventListener('mousedown', (e) => {
+    if (e.target !== chrome && !e.target.classList.contains('window-title')) return;
+    e.preventDefault();
+    dragging = true;
+    bringToFront(win);
+    offsetX = e.clientX - win.offsetLeft;
+    offsetY = e.clientY - win.offsetTop;
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      const area = document.getElementById('desktop-area');
+      const aRect = area.getBoundingClientRect();
+      let nx = e.clientX - offsetX;
+      let ny = e.clientY - offsetY;
+      nx = Math.max(0, Math.min(aRect.width - win.offsetWidth, nx));
+      ny = Math.max(0, Math.min(aRect.height - 32, ny));
+      win.style.left = nx + 'px';
+      win.style.top = ny + 'px';
+    };
+
+    const onUp = () => {
+      dragging = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+/* ==============================================
+   Section 10 — Menu Bar interactions
+   ============================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('menu-js-mark')?.addEventListener('click', openAboutWindow);
+});
+
+/* ==============================================
+   Section 11 — Window Content
+   ============================================== */
+
+// --- Project Window ---
+const PROJECT_DATA = {
+  court: {
+    num: 1,
+    name: 'Court Reservation System',
+    tagline: 'Reserve a court before you leave the house.',
+    problem: 'Managing court bookings through phone calls or paper sign-ups creates friction for both players and facility managers. This system brings reservations online with real-time availability, conflict prevention, and automated email confirmations.',
+    stack: ['Java', 'Spring Boot', 'HTML/CSS/JS', 'PostgreSQL', 'Gmail SMTP'],
+    features: [
+      'Real-time court availability calendar with conflict detection',
+      'User registration, login, and session management',
+      'Automated email confirmation via Gmail SMTP integration',
+      'Admin dashboard for managing courts and reservations'
+    ],
+    demo: '#',
+    github: 'https://github.com/johnsavoy'
+  },
+  portfolio: {
+    num: 2,
+    name: 'Portfolio Tracker',
+    tagline: 'Know exactly where your money stands.',
+    problem: 'Tracking investments across multiple holdings manually is tedious and error-prone. This application connects to live market data to give users a real-time picture of their portfolio performance — gains, losses, and allocation — in one clean dashboard.',
+    stack: ['Java', 'Spring Boot', 'React', 'PostgreSQL', 'Alpha Vantage API'],
+    features: [
+      'Live stock price integration via Alpha Vantage API',
+      'Portfolio dashboard with total value and gain/loss calculations',
+      'Add, edit, and remove positions with purchase price tracking',
+      'Historical performance chart with interactive data points'
+    ],
+    demo: '#',
+    github: 'https://github.com/johnsavoy'
+  },
+  transactions: {
+    num: 3,
+    name: 'Transaction Categorizer',
+    tagline: 'Upload your bank CSV. Get instant clarity.',
+    problem: 'Bank exports are raw and unstructured — hundreds of transactions with no context. This tool parses uploaded CSV files, automatically categorizes each transaction, and surfaces spending patterns through clear visualizations.',
+    stack: ['Java', 'Spring Boot', 'React', 'PostgreSQL'],
+    features: [
+      'CSV upload and parsing for major bank export formats',
+      'Rule-based automatic transaction categorization engine',
+      'Spending breakdown by category with visual charts',
+      'Manual override and custom category creation'
+    ],
+    demo: '#',
+    github: 'https://github.com/johnsavoy'
+  },
+  volunteer: {
+    num: 4,
+    name: 'Volunteer Marketplace',
+    tagline: 'Find where to help. Get verified for doing it.',
+    problem: "Volunteer opportunities are scattered across disconnected platforms, and organizations have no reliable way to verify hours. This marketplace connects volunteers with opportunities and issues digitally-signed verification documents on completion.",
+    stack: ['Java', 'Spring Boot', 'React', 'PostgreSQL', 'PDF Export'],
+    features: [
+      'Organization and volunteer profiles with opportunity listings',
+      'Application and matching workflow with status tracking',
+      'Verified hours logging with digital signature confirmation',
+      'Exportable PDF certificates of volunteer service'
+    ],
+    demo: '#',
+    github: 'https://github.com/johnsavoy'
+  },
+  docclass: {
+    num: 5,
+    name: 'Document Classifier',
+    tagline: 'Drop your docs. Walk away organized.',
+    problem: 'Large document collections — legal files, reports, receipts — require tedious manual sorting. This tool accepts PDF uploads, extracts text content, and applies classification logic to automatically organize documents by type.',
+    stack: ['Java', 'Spring Boot', 'Apache PDFBox', 'PostgreSQL'],
+    features: [
+      'PDF upload with text extraction via Apache PDFBox',
+      'Keyword and pattern-based classification into configurable categories',
+      'Batch processing support for multiple document uploads',
+      'Classification results dashboard with confidence scoring'
+    ],
+    demo: '#',
+    github: 'https://github.com/johnsavoy'
+  }
+};
+
+function getProjectWindowContent(id) {
+  const p = PROJECT_DATA[id];
+  const stackPills = p.stack.map(s => `<span class="pill pill-stack">${s}</span>`).join('');
+  const featureItems = p.features.map(f => `<li>${f}</li>`).join('');
+  return `
+    <div class="proj-tag"><span class="pill pill-accent">Portfolio Project #${p.num}</span></div>
+    <div class="proj-name">${p.name}</div>
+    <div class="proj-tagline">${p.tagline}</div>
+    <div class="proj-divider"></div>
+    <div class="proj-section-label">Problem</div>
+    <div class="proj-body">${p.problem}</div>
+    <div class="proj-section-label">Stack</div>
+    <div class="pills-row">${stackPills}</div>
+    <div class="proj-section-label">Key Features</div>
+    <ul class="proj-features">${featureItems}</ul>
+    <div class="btn-row">
+      <a href="${p.demo}" class="win-btn win-btn-primary">Live Demo</a>
+      <a href="${p.github}" target="_blank" class="win-btn win-btn-secondary">GitHub</a>
+    </div>
+  `;
+}
+
+function openProjectWindow(id) {
+  const p = PROJECT_DATA[id];
+  createWindow(id, p.name, getProjectWindowContent(id), { width: 500 });
+}
+
+// --- About Window ---
+function getAboutWindowContent() {
+  return `
+    <div class="about-cover">
+      <div class="about-avatar">JS</div>
+    </div>
+    <div class="about-header">
+      <div class="about-name">John Savoy</div>
+      <div class="about-title-text">Full Stack Developer</div>
+      <div class="about-location">
+        <svg width="10" height="12" viewBox="0 0 10 12" fill="none"><path d="M5 0C2.79 0 1 1.79 1 4c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4zm0 5.5A1.5 1.5 0 1 1 5 2.5a1.5 1.5 0 0 1 0 3z" fill="rgba(160,200,240,0.7)"/></svg>
+        Greensboro, NC
+      </div>
+    </div>
+    <div class="about-bio">
+      Full stack developer with a focus on Java/Spring Boot backends and React frontends. I build clean, functional software — from financial tools to marketplace platforms — with attention to both the technical foundation and the end user experience. Targeting software engineering and fintech roles in the Charlotte market.
+    </div>
+    <div class="about-stats">
+      <div class="stat-card"><div class="stat-value">5</div><div class="stat-label">Projects</div></div>
+      <div class="stat-card"><div class="stat-value">CLT</div><div class="stat-label">Market</div></div>
+      <div class="stat-card"><div class="stat-value" style="font-size:10px;color:#28c840;">Open</div><div class="stat-label">To Work</div></div>
+    </div>
+    <div class="btn-row">
+      <a href="https://linkedin.com/in/johnsavoy" target="_blank" class="win-btn win-btn-primary">LinkedIn</a>
+      <a href="https://github.com/johnsavoy" target="_blank" class="win-btn win-btn-secondary">GitHub</a>
+    </div>
+  `;
+}
+
+function openAboutWindow() {
+  createWindow('about', 'About John Savoy', getAboutWindowContent(), { width: 400 });
+}
+
+// --- Contact Window ---
+function getContactWindowContent() {
+  return `
+    <div id="contact-form-wrap">
+      <div class="mail-field">
+        <div class="mail-field-label">To:</div>
+        <div class="mail-field-value">thejohnnysavoy@gmail.com</div>
+      </div>
+      <div class="mail-field">
+        <div class="mail-field-label">Subject:</div>
+        <input class="mail-input" id="contact-subject" type="text" placeholder="What are you building?" />
+      </div>
+      <textarea class="mail-textarea" id="contact-message" placeholder="Tell me about your project or opportunity..."></textarea>
+      <div class="mail-field" style="border-bottom:none;padding-top:8px;">
+        <div class="mail-field-label">From:</div>
+        <input class="mail-input" id="contact-email" type="email" placeholder="your@email.com" />
+      </div>
+      <button class="mail-send-btn" id="contact-send">Send Message</button>
+    </div>
+    <div class="mail-success" id="contact-success">
+      <div class="mail-success-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9l4.5 4.5L15 4.5" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Message Sent</h3>
+      <p>Thanks for reaching out — I'll get back to you soon.</p>
+    </div>
+  `;
+}
+
+function openContactWindow() {
+  const win = createWindow('contact', 'New Message', getContactWindowContent(), { width: 440 });
+  // Wire up send button after render
+  setTimeout(() => {
+    const btn = document.getElementById('contact-send');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        const subject = document.getElementById('contact-subject')?.value || '';
+        const message = document.getElementById('contact-message')?.value || '';
+        const email = document.getElementById('contact-email')?.value || '';
+
+        if (!message.trim() || !email.trim()) {
+          btn.textContent = 'Please fill in all fields';
+          setTimeout(() => { btn.textContent = 'Send Message'; }, 2000);
+          return;
+        }
+
+        btn.textContent = 'Sending...';
+        btn.disabled = true;
+
+        try {
+          const res = await fetch('https://formspree.io/f/YOUR_FORM_ID', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ email, subject, message })
+          });
+          if (res.ok) {
+            document.getElementById('contact-form-wrap').style.display = 'none';
+            document.getElementById('contact-success').classList.add('visible');
+          } else {
+            btn.textContent = 'Error — try again';
+            btn.disabled = false;
+          }
+        } catch(e) {
+          btn.textContent = 'Error — try again';
+          btn.disabled = false;
+        }
+      });
+    }
+  }, 100);
+}
+
+// --- Resume Window ---
+function getResumeWindowContent() {
+  return `
+    <div class="resume-toolbar">
+      <a href="resume.pdf" download class="win-btn win-btn-secondary" style="font-size:10px;padding:5px 12px;">Download PDF</a>
+    </div>
+    <div class="resume-panel">
+      <h1>John Savoy</h1>
+      <div class="res-subtitle">Full Stack Developer</div>
+      <div class="res-contact-line">thejohnnysavoy@gmail.com &nbsp;·&nbsp; Greensboro, NC &nbsp;·&nbsp; github.com/johnsavoy &nbsp;·&nbsp; linkedin.com/in/johnsavoy</div>
+
+      <h2>Summary</h2>
+      <p>Full stack developer with hands-on experience building Java/Spring Boot backends, React frontends, and PostgreSQL databases. Focused on building practical, user-facing applications in the fintech and productivity space. Targeting software engineering roles in the Charlotte market.</p>
+
+      <h2>Technical Skills</h2>
+      <div class="res-skill-row">
+        <span class="res-skill-pill">Java</span>
+        <span class="res-skill-pill">Spring Boot</span>
+        <span class="res-skill-pill">JavaScript</span>
+        <span class="res-skill-pill">HTML/CSS</span>
+        <span class="res-skill-pill">React</span>
+        <span class="res-skill-pill">SQL</span>
+        <span class="res-skill-pill">PostgreSQL</span>
+        <span class="res-skill-pill">REST APIs</span>
+        <span class="res-skill-pill">Git/GitHub</span>
+        <span class="res-skill-pill">Maven</span>
+        <span class="res-skill-pill">Postman</span>
+      </div>
+
+      <h2>Projects</h2>
+      <div class="res-proj-name">Court Reservation System</div>
+      <div class="res-proj-sub">Java · Spring Boot · HTML/CSS/JS · PostgreSQL · Gmail SMTP</div>
+      <ul><li>Built full-stack court booking platform with real-time conflict detection and automated email confirmations</li></ul>
+
+      <div class="res-proj-name">Portfolio Tracker</div>
+      <div class="res-proj-sub">Java · Spring Boot · React · PostgreSQL · Alpha Vantage API</div>
+      <ul><li>Built investment tracking dashboard with live stock prices via Alpha Vantage API integration</li></ul>
+
+      <div class="res-proj-name">Transaction Categorizer</div>
+      <div class="res-proj-sub">Java · Spring Boot · React · PostgreSQL</div>
+      <ul><li>Developed CSV parser and rule-based categorization engine for bank transaction data</li></ul>
+
+      <div class="res-proj-name">Volunteer Marketplace</div>
+      <div class="res-proj-sub">Java · Spring Boot · React · PostgreSQL · PDF Export</div>
+      <ul><li>Created marketplace connecting volunteers with opportunities and PDF certificate generation</li></ul>
+
+      <div class="res-proj-name">Document Classifier</div>
+      <div class="res-proj-sub">Java · Spring Boot · Apache PDFBox · PostgreSQL</div>
+      <ul><li>Built PDF text extraction and keyword classification pipeline for document organization</li></ul>
+
+      <h2>Education</h2>
+      <p><strong>Software Development</strong> — Self-directed, project-based learning</p>
+
+      <h2>Contact</h2>
+      <p>thejohnnysavoy@gmail.com &nbsp;·&nbsp; Greensboro, NC &nbsp;·&nbsp; Open to Charlotte-area roles</p>
+    </div>
+  `;
+}
+
+function openResumeWindow() {
+  createWindow('resume', 'John Savoy — Resume', getResumeWindowContent(), { width: 560, height: 520 });
+}
+
+// --- Skills Window ---
+const SKILLS_DATA = {
+  Languages: [
+    { name: 'Java', level: 'Advanced', pct: 85 },
+    { name: 'HTML', level: 'Advanced', pct: 90 },
+    { name: 'CSS', level: 'Advanced', pct: 88 },
+    { name: 'JavaScript', level: 'Proficient', pct: 72 },
+    { name: 'SQL', level: 'Proficient', pct: 70 }
+  ],
+  Frameworks: [
+    { name: 'Spring Boot', level: 'Proficient', pct: 74 },
+    { name: 'React', level: 'Familiar', pct: 50 }
+  ],
+  Tools: [
+    { name: 'Git / GitHub', level: 'Proficient', pct: 76 },
+    { name: 'VS Code', level: 'Proficient', pct: 80 },
+    { name: 'Postman', level: 'Proficient', pct: 72 },
+    { name: 'Maven', level: 'Proficient', pct: 68 }
+  ],
+  Databases: [
+    { name: 'PostgreSQL', level: 'Proficient', pct: 72 },
+    { name: 'H2', level: 'Familiar', pct: 55 },
+    { name: 'Supabase', level: 'Familiar', pct: 48 }
+  ],
+  Concepts: [
+    { name: 'REST APIs', level: 'Proficient', pct: 78 },
+    { name: 'MVC Architecture', level: 'Proficient', pct: 76 },
+    { name: 'OOP', level: 'Advanced', pct: 84 },
+    { name: 'Responsive Design', level: 'Proficient', pct: 74 },
+    { name: 'Agile Basics', level: 'Familiar', pct: 55 }
+  ]
+};
+
+const SIDEBAR_ICONS = {
+  Languages: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4l3.5 3L2 10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><line x1="7" y1="10" x2="12" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`,
+  Frameworks: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="8" y="2" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="8" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="8" y="8" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>`,
+  Tools: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2a3 3 0 0 1 0 4.2L4 12 2 10l5.8-5.5A3 3 0 0 1 9.5 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" fill="none"/></svg>`,
+  Databases: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="4" rx="4" ry="2" stroke="currentColor" stroke-width="1.2"/><path d="M3 4v3c0 1.1 1.8 2 4 2s4-.9 4-2V4" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M3 7v3c0 1.1 1.8 2 4 2s4-.9 4-2V7" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>`,
+  Concepts: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M2 12c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>`
+};
+
+function getSkillsWindowContent() {
+  const cats = Object.keys(SKILLS_DATA);
+  const sidebarItems = cats.map((cat, i) => `
+    <div class="skills-sidebar-item ${i === 0 ? 'active' : ''}" data-cat="${cat}">
+      ${SIDEBAR_ICONS[cat] || ''}
+      ${cat}
+    </div>
+  `).join('');
+
+  const firstCat = cats[0];
+  const firstContent = renderSkillsCategory(firstCat);
+
+  return `
+    <div class="skills-layout">
+      <div class="skills-sidebar">${sidebarItems}</div>
+      <div class="skills-content" id="skills-content-area">${firstContent}</div>
+    </div>
+  `;
+}
+
+function renderSkillsCategory(cat) {
+  const skills = SKILLS_DATA[cat];
+  const items = skills.map(s => `
+    <div class="skill-item">
+      <div class="skill-header">
+        <span class="skill-name">${s.name}</span>
+        <span class="skill-level">${s.level}</span>
+      </div>
+      <div class="skill-bar-bg">
+        <div class="skill-bar-fill" data-pct="${s.pct}"></div>
+      </div>
+    </div>
+  `).join('');
+  return `<div class="skills-cat-title">${cat}</div>${items}`;
+}
+
+function openSkillsWindow() {
+  const win = createWindow('skills', 'Skills', getSkillsWindowContent(), { width: 440, height: 380 });
+
+  setTimeout(() => {
+    // Animate bars for initial category
+    animateSkillBars();
+
+    // Sidebar clicks
+    const sidebar = win.querySelector('.skills-sidebar');
+    const contentArea = win.querySelector('#skills-content-area');
+    if (sidebar && contentArea) {
+      sidebar.addEventListener('click', e => {
+        const item = e.target.closest('.skills-sidebar-item');
+        if (!item) return;
+        sidebar.querySelectorAll('.skills-sidebar-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        contentArea.innerHTML = renderSkillsCategory(item.dataset.cat);
+        animateSkillBars(contentArea);
+      });
+    }
+  }, 100);
+}
+
+function animateSkillBars(container) {
+  const bars = (container || document).querySelectorAll('.skill-bar-fill');
+  bars.forEach(bar => {
+    const pct = bar.dataset.pct;
+    setTimeout(() => { bar.style.width = pct + '%'; }, 50);
+  });
+}
+
+// --- Craev Demo Window ---
+function getCraevWindowContent() {
+  return `
+    <div class="craev-player">
+      <div class="craev-play-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7 5l10 5-10 5V5z" fill="rgba(56,189,248,0.9)"/></svg>
+      </div>
+      <div class="craev-coming-soon">Demo Coming Soon<br/>Recording in Progress</div>
+    </div>
+    <div style="margin-bottom:6px;">
+      <span class="pill pill-accent" style="font-size:9px;">Craev Platform</span>
+    </div>
+    <div class="craev-desc">
+      A full-stack food truck management platform with real-time order management, Stripe Connect payments, and vendor/customer mobile apps. Built to solve the fragmented tools problem for food truck operators — one platform for menus, orders, payments, and analytics.
+    </div>
+    <div class="pills-row">
+      <span class="pill pill-stack">React Native</span>
+      <span class="pill pill-stack">Node.js</span>
+      <span class="pill pill-stack">Stripe Connect</span>
+      <span class="pill pill-stack">PostgreSQL</span>
+      <span class="pill pill-stack">Real-time WebSockets</span>
+    </div>
+  `;
+}
+
+function openCraevWindow() {
+  createWindow('craev', 'Craev — Platform Demo', getCraevWindowContent(), { width: 480 });
+}
+</script>
+</body>
+</html>
