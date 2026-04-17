@@ -1821,8 +1821,8 @@ const PROJECT_DATA = {
       'Automated email confirmation via Gmail SMTP integration',
       'Admin dashboard for managing courts and reservations'
     ],
-    demo: '#',
-    github: 'https://github.com/johnsavoy'
+    demo: 'https://github.com/JohnnyS-dev/court-reservation#readme',
+    github: 'https://github.com/JohnnyS-dev/court-reservation'
   },
   portfolio: {
     num: 2,
@@ -1851,8 +1851,8 @@ const PROJECT_DATA = {
       'Spending breakdown by category with visual charts',
       'Manual override and custom category creation'
     ],
-    demo: '#',
-    github: 'https://github.com/johnsavoy'
+    demo: 'https://github.com/JohnnyS-dev/transaction-categorizer#readme',
+    github: 'https://github.com/JohnnyS-dev/transaction-categorizer'
   },
   volunteer: {
     num: 4,
@@ -1902,7 +1902,7 @@ function getProjectWindowContent(id) {
     <div class="proj-section-label">Key Features</div>
     <ul class="proj-features">${featureItems}</ul>
     <div class="btn-row">
-      <a href="${p.demo}" class="win-btn win-btn-primary">Live Demo</a>
+      <a href="${p.demo}" target="_blank" class="win-btn win-btn-primary">Live Demo</a>
       <a href="${p.github}" target="_blank" class="win-btn win-btn-secondary">GitHub</a>
     </div>
   `;
